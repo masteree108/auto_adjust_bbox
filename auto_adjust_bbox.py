@@ -164,7 +164,6 @@ def detect_people_and_get_adjust_bboxes(bboxes, frame, crop_people):
 
 def IOU_check(src_bbox, adjust_bboxes):
     print("IoU method")
-    check_time = 0
     iou_temp = []
     boxSRCArea = (src_bbox[2] + 1) * (src_bbox[3] + 1)
     for i, adjust_bbox in enumerate(adjust_bboxes):
@@ -172,29 +171,45 @@ def IOU_check(src_bbox, adjust_bboxes):
         # print("xA:%.2f" % xA)
         yA = max(src_bbox[1], adjust_bbox[1])
         # print("yA:%.2f" % yA)
-        xB = min(src_bbox[0] + adjust_bbox[2], src_bbox[0] + adjust_bbox[2])
+        xB = min(src_bbox[0] + src_bbox[2], adjust_bbox[0] + adjust_bbox[2]) - xA
         # print("xB:%.2f" % xB)
-        yB = min(src_bbox[1] + adjust_bbox[3], src_bbox[1] + adjust_bbox[3])
+        yB = min(src_bbox[1] + src_bbox[3], adjust_bbox[1] + adjust_bbox[3]) - yA
         # print("yB:%.2f" % yB)
 
-        interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+        # set max ioy range to
+        xB = max(xB, 0)
+        yB = max(yB, 0)
+
+        interArea = xB * yB
         # print("interArea:%.2f" % interArea)
 
         # boxSRCArea = (src_bbox[2] + 1) * (src_bbox[3] + 1)
         boxADJArea = (adjust_bbox[2] + 1) * (adjust_bbox[3] + 1)
         # compute the intersection over union by taking the intersection
         # area and dividing it by the sum of prediction  ground-truth
-        # areas - the interesection area
+        # areas - the intersection area
         iou = interArea / float(boxSRCArea + boxADJArea - interArea)
         iou_temp.append(iou)
 
     # if max(iou_temp) > 0:
     iou_array = np.array(iou_temp)
     index = np.argmax(iou_array)
-    if index > 0.5:
-        return adjust_bboxes[index]
+    # count time IOU_check
+    try:
+        IOU_check.count += 1
+    except AttributeError:
+        IOU_check.count = 1
+
+    # If it's the first IOU regardless of the IOU score
+    if IOU_check.count != 1:
+        if index > 0.5:
+            return adjust_bboxes[index]
+        else:
+            return src_bbox
     else:
-        return src_bbox
+        return adjust_bboxes[index]
+
+
 
 
 
