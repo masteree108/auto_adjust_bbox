@@ -164,7 +164,7 @@ def detect_people_and_get_adjust_bboxes(bboxes, frame, crop_people):
 
 def IOU_check(src_bbox, adjust_bboxes):
     print("IoU method")
-
+    check_time = 0
     iou_temp = []
     boxSRCArea = (src_bbox[2] + 1) * (src_bbox[3] + 1)
     for i, adjust_bbox in enumerate(adjust_bboxes):
@@ -191,7 +191,12 @@ def IOU_check(src_bbox, adjust_bboxes):
     # if max(iou_temp) > 0:
     iou_array = np.array(iou_temp)
     index = np.argmax(iou_array)
-    return adjust_bboxes[index]
+    if index > 0.5:
+        return adjust_bboxes[index]
+    else:
+        return src_bbox
+
+
 
 def detect_people_and_get_adjust_bboxes2(bboxes, frame, crop_people):
     final_bboxes = []
