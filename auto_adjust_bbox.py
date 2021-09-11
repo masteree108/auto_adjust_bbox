@@ -202,7 +202,7 @@ def IOU_check(src_bbox, adjust_bboxes):
 
     # If it's the first IOU regardless of the IOU score
     if IOU_check.count != 1:
-        if index > 0.5:
+        if iou_array[index] > 0.5:
             return adjust_bboxes[index]
         else:
             return src_bbox
