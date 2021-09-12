@@ -48,6 +48,8 @@ def read_user_input_info():
                     help="path to optional output video file")
     ap.add_argument("-c", "--confidence", type=float, default=0.2,
                     help="minimum probability to filter weak detections")
+    ap.add_argument("-u", "--use-gpu", type=int, default=0,
+                    help="boolean indicating if CUDA GPU should be used")
     args = vars(ap.parse_args())
 
     return args
@@ -571,9 +573,17 @@ if __name__ == '__main__':
                 "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
                 "sofa", "train", "tvmonitor"]
 
+
+
     # load our serialized model from disk
     print("[INFO] loading model...")
     _net = cv2.dnn.readNetFromCaffe(_args["prototxt"], _args["model"])
+    if _args["use_gpu"] == 1:
+        # set CUDA as the preferable backend and target
+        print("[INFO] setting preferable backend and target to CUDA...")
+        _net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        _net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+
 
     # initialize the video stream and output video writer
     print("[INFO] starting video stream...")
