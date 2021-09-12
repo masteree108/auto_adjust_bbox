@@ -105,10 +105,10 @@ def crop_those_people(bboxes, frame):
     return crop_people
 
 
-def detect_people_by_ROI(frame, w, h):
+def detect_people_by_ROI(frame):
     ROI_window_name = "multi ROIs(draw bbox ok:Enter or Space, exit:Esc)"
     cv2.namedWindow(ROI_window_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(ROI_window_name, w, h)
+    cv2.resizeWindow(ROI_window_name, _frame_size_width, _frame_size_height)
     # bbox:posX ,posY, width, length
     bboxes = cv2.selectROIs(ROI_window_name, frame, False)
     cv2.destroyWindow(ROI_window_name)
@@ -303,15 +303,16 @@ def detect_people_and_get_adjust_bboxes1(bboxes, frame):
     return final_bboxes
 
 
-def add_w_and_h(frame):
-    (h, w) = frame.shape[:2]
-    cmb_w = int(abs(1280 - w) / 2)
-    cmb_h = int(abs(960 - h) / 2)
-    img_CMB = cv2.copyMakeBorder(frame, cmb_h, cmb_h, cmb_w, cmb_w, cv2.BORDER_CONSTANT, value=(255, 0, 0))
-    resize_frame = imutils.resize(img_CMB, width=_frame_size_width)
-    (h, w) = resize_frame.shape[:2]
-    return resize_frame, w, h
-
+def frame_add_w_and_h(frame):
+    (vh, vw) = frame.shape[:2]
+    cmb_w = 0
+    cmb_h = 0
+    if vw < _frame_size_width :
+        cmb_w = int(abs(_frame_size_width - vw) / 2)
+    if vh < _frame_size_height:
+        cmb_h = int(abs(_frame_size_height  - vh) / 2)
+    img_CMB = cv2.copyMakeBorder(frame, cmb_h, cmb_h, cmb_w, cmb_w, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+    return img_CMB
 
 def main():
     # loop over frames from the video file stream
@@ -323,8 +324,7 @@ def main():
         if frame is None:
             break
 
-        frame, w, h = add_w_and_h(frame)
-        # frame = imutils.resize(frame, width=_frame_size_width)
+        frame = frame_add_w_and_h(frame)
         ok, update_bboxes = _multi_tracker.update(frame)
         if _adjust_switch == True:
             print("adjust")
@@ -342,7 +342,9 @@ def main():
                 (startX, startY) = p1
                 cv2.putText(frame, "preson", (startX, startY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
 
-        cv2.imshow("Frame", frame)
+        cv2.namedWindow("tracking...", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("tracking...", _frame_size_width, _frame_size_height)
+        cv2.imshow("tracking...", frame)
         key = cv2.waitKey(1) & 0xFF
 
         # if the `q` key was pressed, break from the loop
@@ -367,7 +369,8 @@ if __name__ == '__main__':
     _adjust_switch = True
     # construct the argument parser and parse the arguments
     _args = read_user_input_info()
-    _frame_size_width = 608
+    _frame_size_width = 1280
+    _frame_size_height = 720
     # initialize the list of class labels MobileNet SSD was trained to
     # detect
     _CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
@@ -388,13 +391,12 @@ if __name__ == '__main__':
 
     (grabbed, _frame) = _vs.read()
 
-    # frame = imutils.resize(_frame, width = _frame_size_width)
     print("frame_size:")
     print(_frame.shape[:2])
-    _frame, w, h = add_w_and_h(_frame)
+    _frame = frame_add_w_and_h(_frame)
 
     # using ROI method to draw bbox
-    crop_people_bboxes = detect_people_by_ROI(_frame, w, h)
+    crop_people_bboxes = detect_people_by_ROI(_frame)
     if _adjust_switch == True:
         # for person recognition
         crop_people = crop_those_people(crop_people_bboxes, _frame)
