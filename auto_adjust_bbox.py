@@ -82,8 +82,8 @@ def out_of_bbox_range_frame_paint_black(bboxes, frame):
         w = int(bbox[2])
         h = int(bbox[3])
 
-        offest_x = int(x/5)
-        offest_y = int(y/5)
+        offest_x = int(w/5)
+        offest_y = int(h/5)
 
         xl = x - offset_x
         if xl < 0:
@@ -107,6 +107,43 @@ def out_of_bbox_range_frame_paint_black(bboxes, frame):
         #cv2.imwrite("user_pick_" + str(i) + "_" + str(time.time())+"_.png", img_CMB)
 
     return frame_only_one_person
+
+
+def crop_people_method(bboxes, frame):
+    offset_x = 0
+    offset_y = 0
+    (vh, vw) = _frame.shape[:2]
+    crop_people = []
+    for i, bbox in enumerate(bboxes):
+        x = int(bbox[0])
+        y = int(bbox[1])
+        w = int(bbox[2])
+        h = int(bbox[3])
+
+        offest_x = int(w/5)
+        offest_y = int(h/5)
+
+        xl = x - offset_x
+        if xl < 0:
+            xl = 0
+
+        xr = x + w + offset_x
+        if xr > vw:
+            xr = vw
+
+        yt = y - offset_y
+        if yt < 0:
+            yt = 0
+
+        yb = y + h + offset_y
+        if yb > vh:
+            yb = vh
+        
+        crop_img = frame[yt:yb, xl:xr]
+        crop_people.append(crop_img)
+        #cv2.imwrite("crop_" + str(i) + "_" + str(time.time())+"_.png", crop_img)
+
+    return crop_people
 
 
 def detect_people_by_ROI(frame):
@@ -203,7 +240,7 @@ def IOU_check_for_first_frame(src_bbox, adjust_bboxes):
 
 
 
-def detect_people_and_get_adjust_bboxes_for_first_frame(frame, user_draw_bboxes, frame_only_one_person):
+def detect_people_and_get_adjust_bboxes_for_first_frame_paint_black(frame, user_draw_bboxes, frame_only_one_person):
     final_bboxes = []
     get_bboxes = []
 
@@ -250,6 +287,58 @@ def detect_people_and_get_adjust_bboxes_for_first_frame(frame, user_draw_bboxes,
             final_bboxes.append(IOU_check_for_first_frame(user_draw_bboxes[i], get_bboxes[i]))
 
     return final_bboxes
+
+
+def detect_people_and_get_adjust_bboxes_for_first_frame_crop_people(frame, user_draw_bboxes, crop_people):
+    final_bboxes = []
+    get_bboxes = []
+
+    for i, person in enumerate(crop_people):
+        get_bboxes.append([])
+        (h, w) = person.shape[:2]
+        blob = cv2.dnn.blobFromImage(person, 0.007843, (w, h), 127.5)
+        _net.setInput(blob)
+        detections = _net.forward()
+        recog_person = False
+        for j in np.arange(0, detections.shape[2]):
+            confidence = detections[0, 0, j, 2]
+
+            if confidence > _args["confidence"]:
+                idx = int(detections[0, 0, j, 1])
+                label = _CLASSES[idx]
+                # print("label:%s" % label)
+                if _CLASSES[idx] != "person":
+                    continue
+                else:
+                    recog_person = True
+                    print("%d recog_person" % i)
+                    recog_bbox = detections[0, 0, j, 3:7] * np.array([w, h, w, h])
+                    (startX, startY, endX, endY) = recog_bbox.astype("int")
+                    print("startX:%d" % startX)
+                    print("startY:%d" % startY)
+                    print("endX:%d" % endX)
+                    print("endY:%d" % endY)
+
+                    wadj = int(abs(endX - startX))
+                    offset_w = int(wadj/3)
+                    wadj = wadj+offset_w
+                    print("width_adjust:%d" % wadj)
+                    hadj = int(abs(endY - startY))
+                    offset_h = int(hadj/8)
+                    hadj = hadj+offset_h
+                    print("height_adjust:%d" % hadj)
+                    adjust_x = user_draw_bboxes[i][0] + startX
+                    adjust_y = user_draw_bboxes[i][1] + startY
+                    get_bboxes[i].append((adjust_x, adjust_y, wadj, hadj))
+
+        if recog_person == False:
+            final_bboxes.append(user_draw_bboxes[i])
+        else:
+            # IoU check which box is best
+            final_bboxes.append(IOU_check_for_first_frame(user_draw_bboxes[i], get_bboxes[i]))
+
+    return final_bboxes
+
 
 def detect_people_and_get_adjust_bboxes2(bboxes, frame, crop_people):
     final_bboxes = []
@@ -443,10 +532,21 @@ if __name__ == '__main__':
 
     # using ROI method to draw bbox
     user_draw_bboxes = detect_people_by_ROI(_frame)
+
+    _detect_method = 1
     if _adjust_switch == True:
         # for person recognition
-        frame_only_one_person = out_of_bbox_range_frame_paint_black(user_draw_bboxes, _frame)
-        adjust_bboxes = detect_people_and_get_adjust_bboxes_for_first_frame(_frame, user_draw_bboxes, frame_only_one_person)
+        start_time = time.time()
+        if _detect_method == 1:
+            frame_only_one_person = out_of_bbox_range_frame_paint_black(user_draw_bboxes, _frame)
+            adjust_bboxes = detect_people_and_get_adjust_bboxes_for_first_frame_paint_black(_frame, user_draw_bboxes, frame_only_one_person)
+            elapsed_time = time.time() - start_time
+            print('paint_black_method frist frame adjusted,elapsed time: %2f sec.' % elapsed_time)
+        else:
+            crop_people = crop_people_method(user_draw_bboxes, _frame)
+            adjust_bboxes = detect_people_and_get_adjust_bboxes_for_first_frame_crop_people(_frame, user_draw_bboxes, crop_people)
+            elapsed_time = time.time() - start_time
+            print('crop_mathod frist frame adjusted,elapsed time: %2f sec.' % elapsed_time)
         print(user_draw_bboxes)
         print(adjust_bboxes)
         show_original_bboxes_and_adjust_bboxes_at_same_frame(_frame, user_draw_bboxes, adjust_bboxes)
