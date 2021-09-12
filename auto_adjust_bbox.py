@@ -288,6 +288,64 @@ def detect_people_and_get_adjust_bboxes_for_first_frame_paint_black(frame, user_
 
     return final_bboxes
 
+def detect_people_and_get_adjust_bboxes_for_first_frame_all_frame(frame, user_draw_bboxes):
+    final_bboxes = []
+    get_bboxes = []
+
+
+    # 1. detect people on this frame
+    detect_bboxes = []
+    (h, w) = frame.shape[:2]
+    blob = cv2.dnn.blobFromImage(frame, 0.007843, (w, h), 127.5)
+    _net.setInput(blob)
+    detections = _net.forward()
+    recog_person = False
+    for j in np.arange(0, detections.shape[2]):
+        confidence = detections[0, 0, j, 2]
+
+        if confidence > _args["confidence"]:
+            idx = int(detections[0, 0, j, 1])
+            label = _CLASSES[idx]
+            # print("label:%s" % label)
+            if _CLASSES[idx] != "person":
+                continue
+            else:
+                recog_person = True
+                recog_bbox = detections[0, 0, j, 3:7] * np.array([w, h, w, h])
+                (startX, startY, endX, endY) = recog_bbox.astype("int")
+                print("startX:%d" % startX)
+                print("startY:%d" % startY)
+                print("endX:%d" % endX)
+                print("endY:%d" % endY)
+
+                wadj = int(abs(endX - startX))
+                offset_w = int(wadj/3)
+                wadj = wadj+offset_w
+                print("width_adjust:%d" % wadj)
+                hadj = int(abs(endY - startY))
+                offset_h = int(hadj/10)
+                hadj = hadj+offset_h
+                print("height_adjust:%d" % hadj)
+                detect_bboxes.append((startX, startY, wadj, hadj))
+
+    # debug:watch detect result 
+    save_result = False
+    sframe = frame.copy()
+    if save_result == True:
+        for i, newbox in enumerate(detect_bboxes):
+            p1 = (int(newbox[0]), int(newbox[1]))
+            p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))
+            cv2.rectangle(sframe, p1, p2, (0, 0, 255), 2)
+            (startX, startY) = p1
+            cv2.putText(sframe, "model", (startX, startY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+        cv2.imwrite("detect_result" + "_" + str(time.time())+"_.png", sframe)
+
+    # 2. using IoU to find which are match user drawed bboxes
+    for i,bbox in enumerate(user_draw_bboxes):
+        # IoU check which box is best
+        final_bboxes.append(IOU_check_for_first_frame(bbox, detect_bboxes))
+
+    return final_bboxes
 
 def detect_people_and_get_adjust_bboxes_for_first_frame_crop_people(frame, user_draw_bboxes, crop_people):
     final_bboxes = []
@@ -542,11 +600,16 @@ if __name__ == '__main__':
             adjust_bboxes = detect_people_and_get_adjust_bboxes_for_first_frame_paint_black(_frame, user_draw_bboxes, frame_only_one_person)
             elapsed_time = time.time() - start_time
             print('paint_black_method frist frame adjusted,elapsed time: %2f sec.' % elapsed_time)
-        else:
+        elif _detect_method == 2:
             crop_people = crop_people_method(user_draw_bboxes, _frame)
             adjust_bboxes = detect_people_and_get_adjust_bboxes_for_first_frame_crop_people(_frame, user_draw_bboxes, crop_people)
             elapsed_time = time.time() - start_time
             print('crop_mathod frist frame adjusted,elapsed time: %2f sec.' % elapsed_time)
+        elif _detect_method == 3:
+            elapsed_time = time.time() - start_time
+            adjust_bboxes = detect_people_and_get_adjust_bboxes_for_first_frame_all_frame(_frame, user_draw_bboxes)
+            print('crop_mathod frist frame adjusted,elapsed time: %2f sec.' % elapsed_time)
+
         print(user_draw_bboxes)
         print(adjust_bboxes)
         show_original_bboxes_and_adjust_bboxes_at_same_frame(_frame, user_draw_bboxes, adjust_bboxes)
