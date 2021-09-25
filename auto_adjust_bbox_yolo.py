@@ -250,7 +250,7 @@ def detect_people_and_get_adjust_bboxes_for_first_frame_paint_black(frame, user_
         get_bboxes.append([])
         (h, w) = person.shape[:2]
         blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),
-                                         swapRB=True, crop=False)
+                                     swapRB=True, crop=False)
         _net.setInput(blob)
         detections = _net.forward()
         recog_person = True
@@ -261,8 +261,7 @@ def detect_people_and_get_adjust_bboxes_for_first_frame_paint_black(frame, user_
         boxes = []
         confidences = []
         classIDs = []
-        idxs=[]
-        print("1")
+        idxs = []
         # loop over each of the layer outputs
         for output in layerOutputs:
             # loop over each of the detections
@@ -289,22 +288,22 @@ def detect_people_and_get_adjust_bboxes_for_first_frame_paint_black(frame, user_
                     # and and left corner of the bounding box
                     x = int(centerX - (width / 2))
                     y = int(centerY - (height / 2))
-                    if _LABELS[classID]!="person":
+                    if _LABELS[classID] != "person":
                         continue
                     else:
-                    # update our list of bounding box coordinates,
-                    # confidences, and class IDs
+                        # update our list of bounding box coordinates,
+                        # confidences, and class IDs
                         boxes.append([x, y, int(width), int(height)])
                         confidences.append(float(confidence))
                         classIDs.append(classID)
-        idxs = cv2.dnn.NMSBoxes(boxes, confidences, _args["confidence"],_args["threshold"])
+        idxs = cv2.dnn.NMSBoxes(boxes, confidences, _args["confidence"], _args["threshold"])
         print("idxs")
         print(idxs)
         if recog_person == False:
             final_bboxes.append(user_draw_bboxes[i])
         else:
             # IoU check which box is best
-            final_bboxes.append(IOU_check_for_first_frame(user_draw_bboxes[i],boxes))
+            final_bboxes.append(IOU_check_for_first_frame(user_draw_bboxes[i], boxes))
 
     return final_bboxes
 
@@ -442,63 +441,71 @@ def detect_people_and_get_adjust_bboxes_for_first_frame_all_frame(frame, user_dr
     return final_bboxes
 """
 
-"""def detect_people_and_get_adjust_bboxes2(bboxes, frame, crop_people):
+
+def detect_people_and_get_adjust_bboxes2(bboxes, frame, crop_people):
     final_bboxes = []
     get_bboxes = []
 
     for i, crop_person in enumerate(crop_people):
         ct = i - 1
-        '''
-        # test only adjust below
-        if i % 2 == 0:
-            final_bboxes.append(bboxes[ct])
-            return final_bboxes 
-        '''
         (h, w) = frame.shape[:2]
-        # (h, w) = crop_person.shape[:2]
-        blob = cv2.dnn.blobFromImage(frame, 0.007843, (w, h), 127.5)
-        # blob = cv2.dnn.blobFromImage(crop_person, 0.007843, (w, h), 127.5)
+        blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),
+                                     swapRB=True, crop=False)
         _net.setInput(blob)
         detections = _net.forward()
         recog_person = False
-        for j in np.arange(0, detections.shape[2]):
-            confidence = detections[0, 0, j, 2]
+        layerOutputs = _net.forward(_ln)
 
-            if confidence > _args["confidence"]:
-                idx = int(detections[0, 0, j, 1])
-                label = _CLASSES[idx]
-                # print("label:%s" % label)
-                if _CLASSES[idx] != "person":
-                    continue
-                else:
-                    recog_person = True
-                    print("recog_person")
-                    recog_bbox = detections[0, 0, j, 3:7] * np.array([w, h, w, h])
-                    (startX, startY, endX, endY) = recog_bbox.astype("int")
-                    print("startX:%d" % startX)
-                    print("startY:%d" % startY)
-                    print("endX:%d" % endX)
-                    print("endY:%d" % endY)
-                    wadj = int(abs(endX - startX))
-                    # wadj = wadj + int(wadj/10)
-                    print("width_adjust:%d" % wadj)
-                    hadj = int(abs(endY - startY))
-                    # hadj = hadj + int(hadj/10)
-                    print("height_adjust:%d" % hadj)
-                    x = bboxes[ct][0] + startX
-                    y = bboxes[ct][1] + startY
-                    # final_bboxes.append((x, y, wadj, hadj))
-                    get_bboxes.append((startX, startY, wadj, hadj))
+        # initialize our lists of detected bounding boxes, confidences,
+        # and class IDs, respectively
+        boxes = []
+        confidences = []
+        classIDs = []
+        idxs = []
+        print("1")
+        # loop over each of the layer outputs
+        for output in layerOutputs:
+            # loop over each of the detections
+            for detection in output:
+                # extract the class ID and confidence (i.e., probability)
+                # of the current object detection
+                scores = detection[5:]
+                classID = np.argmax(scores)
+                confidence = scores[classID]
+
+                # filter out weak predictions by ensuring the detected
+                # probability is greater than the minimum probability
+                if confidence > _args["confidence"]:
+                    # scale the bounding box coordinates back relative to
+                    # the size of the image, keeping in mind that YOLO
+                    # actually returns the center (x, y)-coordinates of
+                    # the bounding box followed by the boxes' width and
+                    # height
+
+                    box = detection[0:4] * np.array([w, h, w, h])
+                    (centerX, centerY, width, height) = box.astype("int")
+                    # use the center (x, y)-coordinates to derive the top
+                    # and and left corner of the bounding box
+                    x = int(centerX - (width / 2))
+                    y = int(centerY - (height / 2))
+                    if _LABELS[classID] != "person":
+                        continue
+                    # update our list of bounding box coordinates,
+                    # confidences, and class IDs
+                    else:
+                        boxes.append([x, y, int(width), int(height)])
+                        confidences.append(float(confidence))
+                        classIDs.append(classID)
+            idxs = cv2.dnn.NMSBoxes(boxes, confidences, _args["confidence"], _args["threshold"])
         if recog_person == False:
             # final_bboxes.append((0 ,0 ,0 ,0))
             final_bboxes.append(bboxes[ct])
         else:
             # IoU check which box is best
-            final_bboxes.append(IOU_check(bboxes[ct], get_bboxes))
-
+            final_bboxes.append(IOU_check(bboxes[ct], boxes))
     return final_bboxes
 
-"""
+
 def frame_add_w_and_h(frame):
     (vh, vw) = frame.shape[:2]
     cmb_w = 0
@@ -523,21 +530,27 @@ def frame_add_w_and_h(frame):
 def main():
     # loop over frames from the video file stream
     while True:
+        try:
+            main.count += 1  # 修改函式屬性的值
+        except AttributeError:
+            main.count = 1  # 建立函式的屬性
+
+        print("main%d" % main.count)
         # grab the next frame from the video file
         (grabbed, frame) = _vs.read()
 
         # check to see if we have reached the end of the video file
         if frame is None:
             break
-
         frame = frame_add_w_and_h(frame)
         ok, update_bboxes = _multi_tracker.update(frame)
-        if _adjust_switch == True:
-            print("adjust")
-            crop_people = crop_those_people(update_bboxes, frame)
+        if (_adjust_switch & (main.count % 5 == 0)) == True:
+            print("adjust+yolo")
+            crop_people = crop_people_method(update_bboxes, frame)
             adjust_bboxes = detect_people_and_get_adjust_bboxes2(update_bboxes, frame, crop_people)
             # adjust_bboxes = detect_people_and_get_adjust_bboxes1(update_bboxes, frame)
         else:
+            print("tracking")
             adjust_bboxes = update_bboxes.copy()
         print(adjust_bboxes)
         if ok:
@@ -600,8 +613,6 @@ def show_original_bboxes_and_adjust_bboxes_at_same_frame(frame, user_draw_bboxes
         (startX, startY) = p1
         cv2.putText(draw_frame, "model", (startX, startY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
-    show_frame(draw_frame, "user draws bboxes(green) and model adjust bboxes(red)")
-
 
 if __name__ == '__main__':
     # global variables add _ in front of variable
@@ -621,8 +632,8 @@ if __name__ == '__main__':
                                dtype="uint8")
 
     # derive the paths to the YOLO weights and model configuration
-    weightsPath = os.path.sep.join([_args["yolo"], "yolov4.weights"])
-    configPath = os.path.sep.join([_args["yolo"], "yolov4.cfg"])
+    weightsPath = os.path.sep.join([_args["yolo"], "yolov3.weights"])
+    configPath = os.path.sep.join([_args["yolo"], "yolov3.cfg"])
 
     # load our YOLO object detector trained on COCO dataset (80 classes)
     print("[INFO] loading YOLO from disk...")
@@ -685,4 +696,4 @@ if __name__ == '__main__':
     _fps = FPS().start()
 
     # tracking person on the video
-    # main()
+    main()
