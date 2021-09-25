@@ -14,6 +14,7 @@ import imutils
 import cv2
 import os
 import time
+import mot_class as mtc
 
 
 def get_algorithm_tracker(algorithm):
@@ -199,8 +200,10 @@ def IOU_check(src_bbox, adjust_bboxes):
     # If it's the first IOU regardless of the IOU score
     if IOU_check.count != 1:
         if iou_array[index] > 0.5:
+            print("adjust_bboxes")
             return adjust_bboxes[index]
         else:
+            print("src_box")
             return src_bbox
     else:
         return adjust_bboxes[index]
@@ -462,7 +465,6 @@ def detect_people_and_get_adjust_bboxes2(bboxes, frame, crop_people):
         confidences = []
         classIDs = []
         idxs = []
-        print("1")
         # loop over each of the layer outputs
         for output in layerOutputs:
             # loop over each of the detections
@@ -493,6 +495,7 @@ def detect_people_and_get_adjust_bboxes2(bboxes, frame, crop_people):
                     # update our list of bounding box coordinates,
                     # confidences, and class IDs
                     else:
+                        recog_person = True
                         boxes.append([x, y, int(width), int(height)])
                         confidences.append(float(confidence))
                         classIDs.append(classID)
@@ -543,7 +546,8 @@ def main():
         if frame is None:
             break
         frame = frame_add_w_and_h(frame)
-        ok, update_bboxes = _multi_tracker.update(frame)
+        #ok, update_bboxes = _multi_tracker.update(frame)
+        ok, update_bboxes = MTC.update(frame)
         if (_adjust_switch & (main.count % 5 == 0)) == True:
             print("adjust+yolo")
             crop_people = crop_people_method(update_bboxes, frame)
@@ -684,13 +688,16 @@ if __name__ == '__main__':
             elapsed_time = time.time() - start_time
             adjust_bboxes = detect_people_and_get_adjust_bboxes_for_first_frame_all_frame(_frame, user_draw_bboxes)
             print('crop_mathod frist frame adjusted,elapsed time: %2f sec.' % elapsed_time)
-
+        print("user_draw_bboxes-------------------------------")
         print(user_draw_bboxes)
+        print("adjust_bboxes----------------------------------")
         print(adjust_bboxes)
         show_original_bboxes_and_adjust_bboxes_at_same_frame(_frame, user_draw_bboxes, adjust_bboxes)
-        init_tracker(adjust_bboxes, _frame)
+        # init_tracker(adjust_bboxes, _frame)
+        MTC = mtc.mot_class(_frame,  tuple(map(tuple, user_draw_bboxes)))
+        process_task_num = MTC.read_process_task_num()
     else:
-        init_tracker(user_draw_bboxes, _frame)
+        init_tracker( user_draw_bboxes, _frame)
 
     # start the frames per second throughput estimator
     _fps = FPS().start()
