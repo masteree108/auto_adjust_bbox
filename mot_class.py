@@ -106,9 +106,10 @@ class mot_class():
         # print("tracker_process")
         tracker = cv2.MultiTracker_create()
         for i, bbox in enumerate(bboxes):
-            print("bbox--------------------------------------")
-            print(bbox)
-            tracker.add(cv2.TrackerCSRT_create(), frame, bbox)
+            mbbox = (bbox[0], bbox[1] ,bbox[2], bbox[3])
+            print("mbbox--------------------------------------")
+            print(mbbox)
+            tracker.add(cv2.TrackerCSRT_create(), frame, mbbox)
 
         while True:
             bboxes_org = []
@@ -118,11 +119,12 @@ class mot_class():
             ok, bboxes_org = tracker.update(frame)
             # print(bboxes_org)
             for box in bboxes_org:
-                startX = box[0]
-                startY = box[1]
-                endX = box[0] + box[2]
-                endY = box[1] + box[3]
-                bbox = (startX, startY, box[2], box[3])
+                startX = int(box[0])
+                startY = int(box[1])
+                endX = int(box[0] + box[2])
+                endY = int(box[1] + box[3])
+                #bbox = (startX, startY, box[2], box[3])
+                bbox = (startX, startY, endX, endY)
                 bboxes_transfer.append(bbox)
             outputQueue.put(bboxes_transfer)
 

@@ -1,11 +1,3 @@
-# USAGE
-# python MOTF_process_pool.py --prototxt mobilenet_ssd/MobileNetSSD_deploy.prototxt \
-#	--model mobilenet_ssd/MobileNetSSD_deploy.caffemodel --video race.mp4
-
-# watch CPU loading on the ubuntu
-# ps axu | grep [M]OTF_process_pool.py | awk '{print $2}' | xargs -n1 -I{} ps -o sid= -p {} | xargs -n1 -I{} ps --forest -o user,pid,ppid,cpuid,%cpu,%mem,stat,start,time,command -g {}
-
-# import the necessary packages
 from imutils.video import FPS
 from multiprocessing import Pool
 import numpy as np
@@ -14,27 +6,7 @@ import imutils
 import cv2
 import os
 import time
-
-
-def get_algorithm_tracker(algorithm):
-    if algorithm == 'BOOSTING':
-        tracker = cv2.TrackerBoosting_create()
-    elif algorithm == 'MIL':
-        tracker = cv2.TrackerMIL_create()
-    elif algorithm == 'KCF':
-        tracker = cv2.TrackerKCF_create()
-    elif algorithm == 'TLD':
-        tracker = cv2.TrackerTLD_create()
-    elif algorithm == 'MEDIANFLOW':
-        tracker = cv2.TrackerMedianFlow_create()
-    elif algorithm == 'GOTURN':
-        tracker = cv2.TrackerGOTURN_create()
-    elif algorithm == 'CSRT':
-        tracker = cv2.TrackerCSRT_create()
-    elif algorithm == 'MOSSE':
-        tracker = cv2.TrackerMOSSE_create()
-    return tracker
-
+import mot_class as mtc
 
 def read_user_input_info():
     ap = argparse.ArgumentParser()
@@ -53,24 +25,6 @@ def read_user_input_info():
     args = vars(ap.parse_args())
 
     return args
-
-
-def init_tracker(bboxes, frame):
-    # print("detect_people_,number:%d" % detect_people_num)
-    # grab the appropiate object tracker using our dictionary of
-    # OpenCV object tracker objects
-    # it should brings (left, top, width, height) to tracker.init() function
-    # parameters are left, top , right and bottom in the box
-    # so those parameters need to minus like below to get width and height
-    for i, org_bbox in enumerate(bboxes):
-        newbbox = []
-        newbbox.append(int(org_bbox[0]))
-        newbbox.append(int(org_bbox[1]))
-        newbbox.append(int(org_bbox[2]))
-        newbbox.append(int(org_bbox[3]))
-
-        bbox = (newbbox[0], newbbox[1], newbbox[2], newbbox[3])
-        _multi_tracker.add(get_algorithm_tracker("CSRT"), frame, bbox)
 
 
 def out_of_bbox_range_frame_paint_black(bboxes, frame):
@@ -488,7 +442,7 @@ def main():
             break
 
         frame = frame_add_w_and_h(frame)
-        ok, update_bboxes = _multi_tracker.update(frame)
+        ok, update_bboxes = MTC.update(frame)
         if _adjust_switch == True:
             print("adjust")
             crop_people = crop_those_people(update_bboxes, frame)
@@ -500,7 +454,7 @@ def main():
         if ok:
             for i, newbox in enumerate(adjust_bboxes):
                 p1 = (int(newbox[0]), int(newbox[1]))
-                p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))
+                p2 = (int(newbox[2]), int(newbox[3]))
                 cv2.rectangle(frame, p1, p2, (0, 255, 0), 2)
                 (startX, startY) = p1
                 cv2.putText(frame, "preson", (startX, startY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
@@ -561,7 +515,7 @@ def show_original_bboxes_and_adjust_bboxes_at_same_frame(frame, user_draw_bboxes
 
 if __name__ == '__main__':
     # global variables add _ in front of variable
-    _adjust_switch = True
+    _adjust_switch = False
     # construct the argument parser and parse the arguments
     _args = read_user_input_info()
     _frame_size_width = 1280
@@ -588,9 +542,6 @@ if __name__ == '__main__':
     # initialize the video stream and output video writer
     print("[INFO] starting video stream...")
     _vs = cv2.VideoCapture(_args["video"])
-
-    # for saving tracker objects
-    _multi_tracker = cv2.MultiTracker_create()
 
     (grabbed, _frame) = _vs.read()
 
@@ -623,12 +574,12 @@ if __name__ == '__main__':
         print(user_draw_bboxes)
         print(adjust_bboxes)
         show_original_bboxes_and_adjust_bboxes_at_same_frame(_frame, user_draw_bboxes, adjust_bboxes)
-        init_tracker(adjust_bboxes, _frame)
+        MTC = mtc.mot_class(_frame,  adjust_bboxes)
     else:
-        init_tracker(user_draw_bboxes, _frame)
+        MTC = mtc.mot_class(_frame,  user_draw_bboxes)
 
     # start the frames per second throughput estimator
     _fps = FPS().start()
 
     # tracking person on the video
-    #main()
+    main()
